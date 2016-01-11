@@ -1,0 +1,163 @@
+import org.openhab.core.library.types.*
+import org.openhab.core.persistence.*
+import org.openhab.model.script.actions.*
+import java.lang.Math
+
+// Timer um kurzzeitige Verbindungabbrüche zu puffern
+var Timer t_presence_Dave_absent
+var Timer t_presence_Alice_absent
+
+rule "Anwesenheit jede Minute prüfen"
+when
+    Time cron "0 */1 * * * ?"
+then
+  if (Presence.state == ON) {
+    logInfo("smarthome.rules", "check ... "+ gMobiles.members.toString)
+
+    if(gMobiles.members.filter(s | s.state == ON).size == 0) {
+      logInfo("smarthome.rules", "Abwesenheit erkannt. Keiner Zuhause!")
+      pushover("Abwesenheit erkannt. Keiner Zuhause!")
+      sendCommand(Presence, OFF)
+    }
+  } else {
+    //For initialisation. If Presence is undefined or off, although it should be on.
+    if(gMobiles.members.filter(s | s.state == ON).size > 0) {
+      sendCommand(Presence, ON)
+    } else if (Presence.state == Undefined || Presence.state == Uninitialized) {
+      sendCommand(Presence, OFF)
+    }
+  }
+end
+
+rule "Anwesenheit setzen, wenn mindestens ein Mobiltelefon gefunden wurde"
+when
+  Item gMobiles changed
+then
+  if (Presence.state != ON) {
+    if(gMobiles.members.filter(s | s.state == ON).size > 0) {
+      logInfo("presence.rules", "Ein oder mehr Mobiletelefone im WLAN gefunden. Anwesenheit setzen.")
+      sendCommand(Presence, ON)
+    }
+  }
+end
+
+rule "Statusupdate PresenceDaveMobile"
+when
+  Item PresenceDaveMobile received update
+then
+	if (PresenceDaveMobile.state == OFF) {
+    logInfo("presence.rules", "Statusupdate: PresenceDaveMobile ist gleich OFF")
+
+    // Abwesenheitstimer starten, wenn nicht bereits einer gesetzt wurde und PresenceDave ON ist
+		if (PresenceDave.state == ON) {
+      logInfo("presence.rules", "PresenceDave (ON) && PresenceDaveMobile(OFF): Timer-Status -> " + t_presence_Dave_absent)
+
+      if ( (t_presence_Dave_absent == null) ) {
+        logInfo("presence.rules", "Dave S5 nicht im WLAN gefunden -> Kein Timer gesetzt. Abwesenheitstimer t_presence_Dave_absent setzen")
+				t_presence_Dave_absent = createTimer(now.plusMinutes(5)) [|
+					logInfo("presence.rules", "Abwesenheitstimer t_presence_Dave_absent abgelaufen -> PresenceDave von ON auf OFF")
+					sendCommand(PresenceDave, OFF)
+				]
+			}
+		}
+
+	} else if (PresenceDaveMobile.state == ON) {
+
+		logInfo("presence.rules", "Statusupdate: PresenceDaveMobile ist gleich ON")
+
+		// Abwesenheitstimer prüfen und ggf. abbrechen
+		logInfo("presence.rules", "PresenceDaveMobile(ON): Timer-Status -> " + t_presence_Dave_absent)
+		if (t_presence_Dave_absent != null) {
+			logInfo("presence.rules", "Abwesenheitstimer t_presence_Dave_absent abbrechen. (Flapping)")
+			t_presence_Dave_absent.cancel
+			t_presence_Dave_absent = null
+		} else {
+			logInfo("presence.rules", "Abwesenheitstimer t_presence_Dave_absent ist nicht aktiv")
+		}
+
+		// Anwesenheitsstatus auf ON setzen, falls im Status OFF
+		if (PresenceDave.state == OFF) {
+			logInfo("presence.rules", "Dave S5 im WLAN gefunden -> PresenceDave: OFF -> ON")
+			sendCommand(PresenceDave, ON)
+		}
+
+	} else {
+		logError("presence.rules", "Statusupdate PresenceDaveMobile UNDEFINED")
+	}
+end
+
+rule "Statusupdate PresenceDave -> OFF"
+	when
+		Item PresenceDave received command OFF
+	then
+		logInfo("presence.rules", "Dave hat das Haus verlassen ... (PresenceDave -> OFF)")
+		pushover("Dave hat das Haus verlassen ... (PresenceDave -> OFF)")
+	end
+
+rule "Statusupdate PresenceDave -> ON"
+	when
+		Item PresenceDave received command ON
+	then
+		logInfo("presence.rules", "Dave kommt nach Hause ... (PresenceDave -> ON)")
+		pushover("Dave kommt nach Hause ... (PresenceDave -> ON)")
+	end
+
+rule "Statusupdate PresenceAliceMobile"
+	when
+		Item PresenceAliceMobile received update
+	then
+		if (PresenceAliceMobile.state == OFF) {
+
+			logInfo("presence.rules", "Statusupdate PresenceAliceMobile -> OFF")
+
+			// Abwesenheitstimer starten, wenn nicht bereits einer gesetzt wurde und PresenceAlice ON ist
+			if (PresenceAlice.state == ON) {
+				if ( (t_presence_Alice_absent == null) ) {
+					logInfo("presence.rules", "Alice S3 nicht im WLAN gefunden -> Abwesenheitstimer t_presence_Alice_absent setzen")
+					t_presence_Alice_absent = createTimer(now.plusMinutes(5)) [|
+						logInfo("presence.rules", "Abwesenheitstimer t_presence_Alice_absent abgelaufen -> PresenceAlice: ON -> OFF")
+						sendCommand(PresenceAlice, OFF)
+					]
+				}
+			}
+
+		} else if (PresenceAliceMobile.state == ON) {
+
+			logInfo("presence.rules", "Statusupdate PresenceAliceMobile -> ON")
+
+			// Abwesenheitstimer prüfen und ggf. abbrechen
+			logInfo("presence.rules", "PresenceAliceMobile(ON): Timer-Status -> " + t_presence_Alice_absent)
+			if (t_presence_Alice_absent != null) {
+				logInfo("presence.rules", "Abwesenheitstimer t_presence_Alice_absent abbrechen. (Flapping)")
+				t_presence_Alice_absent.cancel
+				t_presence_Alice_absent = null
+			} else {
+				logInfo("presence.rules", "Abwesenheitstimer t_presence_Alice_absent ist nicht aktiv")
+			}
+
+			// Anwesenheitsstatus auf ON setzen, falls im Status OFF
+			if (PresenceAlice.state == OFF) {
+				logInfo("presence.rules", "Alice S3 im WLAN gefunden -> PresenceAlice: OFF -> ON")
+				sendCommand(PresenceAlice, ON)
+			}
+
+		} else {
+			logError("presence.rules", "Statusupdate PresenceAliceMobile UNDEFINED")
+		}
+	end
+
+rule "Statusupdate PresenceAlice -> OFF"
+	when
+		Item PresenceAlice received command OFF
+	then
+		logInfo("presence.rules", "Alice hat das Haus verlassen ... (PresenceAlice -> OFF)")
+		pushover("Alice hat das Haus verlassen ... (PresenceAlice -> OFF)")
+	end
+
+rule "Statusupdate PresenceAlice -> ON"
+	when
+		Item PresenceAlice received command ON
+	then
+		logInfo("presence.rules", "Alice kommt nach Hause ... (PresenceAlice -> ON)")
+		pushover("Alice kommt nach Hause ... (PresenceAlice -> ON)")
+	end
