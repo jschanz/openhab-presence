@@ -2,6 +2,8 @@
 
 (working) presence detection for openHAB
 
+-> http://baublog.jensschanz.de/2016/01/11/smarthome-update/
+
 This example describes a presence detection solution for openHAB. I've found a lot of other ideas and suggestion in the Internet, but none of them was working for me and my environment. So here is solution thousand and X ...
 The presence solution here is based on the networkhealth-binding. No magic dust like some awesome Fritz!Box hacks are needed. Everything ist based on plain ICMP (if openHAB running as root), otherwise Java would do a tcp connect to port 7 (echo port). This could sometimes create little bit strange behaviors.  
 
