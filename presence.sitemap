@@ -1,0 +1,14 @@
+sitemap Smarthome label="Hauptmenue" {
+  Text label="Anwesenheit" icon="users" {
+    Frame label="Anwesentheitsstatus" {
+      Switch item=Presence label="Status"
+      Switch item=PresenceDave label="Dave"
+      Switch item=PresenceAlice label="Alice"
+    }
+
+    Frame label="Mobiltelefone" {
+      Switch item=PresenceDaveMobile
+      Switch item=PresenceAliceMobile
+    }
+  }
+}
