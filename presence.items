@@ -1,0 +1,11 @@
+Group gMobiles
+
+Switch Presence				"Status" 				<users>
+
+/* Dave */
+Switch PresenceDaveMobile	  "Handy Dave"		<ethernet>					{nh="192.168.178.100"}
+Switch PresenceDave 		    "Dave"					<man> 		(gMobiles)
+
+/* Alice */
+Switch PresenceAliceMobile	  "Handy Alice"		<ethernet>					{nh="192.168.178.100"}
+Switch PresenceAlice 		    "Alice"					<woman> 	(gMobiles)
